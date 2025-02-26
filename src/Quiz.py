@@ -1,6 +1,4 @@
-# backend/main.py
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import json
 import re
@@ -8,23 +6,16 @@ from groq import Groq
 from typing import List, Optional
 import os
 from dotenv import load_dotenv
+
+# Load environment variables from the project root (.env)
 env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.env'))
 load_dotenv(env_path)
-# Instantiate FastAPI app
-app = FastAPI()
 
-# Enable CORS for all routes
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Create an APIRouter instance for quiz endpoints
+quiz_router = APIRouter()
 
-# Instantiate the Groq client with your API key
-GROQ_API_KEY= os.getenv("GROQ_API_KEY_2")
-
+# Instantiate the Groq client with your API key for quiz functionality
+GROQ_API_KEY = os.getenv("GROQ_API_KEY_2")
 groq_client = Groq(api_key=GROQ_API_KEY)
 
 class QuizRequest(BaseModel):
@@ -32,17 +23,16 @@ class QuizRequest(BaseModel):
     difficulty: str = "Easy"
     proficiency: str = "Beginner"
 
-@app.post("/generate-quiz")
+@quiz_router.post("/generate-quiz")
 def generate_quiz(data: QuizRequest):
     subject = data.subject.strip()
     difficulty = data.difficulty
     proficiency = data.proficiency
 
-    # If subject is "DSA", interpret it as "Data Structures and Algorithms"
     if subject.upper() == "DSA":
         subject = "Data Structures and Algorithms"
 
-    # Updated system prompt that also instructs the AI to output a "concept" field for each question.
+    # Define a system prompt that instructs the AI to generate MCQs with a concept field.
     messages = [
         {
             "role": "system",
@@ -68,8 +58,8 @@ def generate_quiz(data: QuizRequest):
         }
     ]
 
-    # Create the chat completion using the Groq client.
-    completion = client.chat.completions.create(
+    # Use the groq_client to generate the quiz
+    completion = groq_client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=messages,
         temperature=1,
@@ -79,16 +69,14 @@ def generate_quiz(data: QuizRequest):
         stop=None,
     )
 
-    # Get the quiz output as a string.
     quiz_content_str = completion.choices[0].message.content
     print("Raw quiz content from AI:", quiz_content_str)
 
-    # First try: attempt to load the output directly.
+    # Try to parse the output as JSON
     try:
         quiz_array = json.loads(quiz_content_str)
     except Exception as e:
         print("Direct JSON parsing failed:", e)
-        # Fallback: extract the substring from the first '[' to the last ']'
         start = quiz_content_str.find('[')
         end = quiz_content_str.rfind(']')
         if start != -1 and end != -1:
@@ -97,13 +85,12 @@ def generate_quiz(data: QuizRequest):
                 quiz_array = json.loads(json_string)
             except Exception as e:
                 print("Fallback JSON parsing failed:", e)
-                quiz_array = []  # Return an empty list if parsing still fails
+                quiz_array = []
         else:
             quiz_array = []
     
     return {"quiz": quiz_array}
 
-# New models for generating targeted feedback
 class IncorrectQuestion(BaseModel):
     id: int
     question: str
@@ -114,10 +101,9 @@ class IncorrectQuestion(BaseModel):
 class FeedbackRequest(BaseModel):
     incorrectQuestions: List[IncorrectQuestion]
 
-@app.post("/generate-feedback")
+@quiz_router.post("/generate-feedback")
 def generate_feedback(data: FeedbackRequest):
     incorrect_questions = data.incorrectQuestions
-    # Build a summary string for the incorrect questions.
     questions_text = ""
     for q in incorrect_questions:
         questions_text += f"Question ID {q.id}: {q.question}\n"
@@ -140,7 +126,7 @@ def generate_feedback(data: FeedbackRequest):
         }
     ]
 
-    completion = client.chat.completions.create(
+    completion = groq_client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=messages,
         temperature=0.7,
@@ -153,6 +139,6 @@ def generate_feedback(data: FeedbackRequest):
     feedback = completion.choices[0].message.content
     return {"feedback": feedback}
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8002)
+@quiz_router.get("/")
+def read_quiz():
+    return {"message": "Quiz API is working"}

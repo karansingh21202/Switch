@@ -1,35 +1,29 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, HTTPException
 from typing import Dict
-from time import time
 import re
-from urllib.parse import unquote
-import requests
-from googlesearch import search
 import os
 from dotenv import load_dotenv
-
-# For YouTube search functionality:
-from youtubesearchpython import VideosSearch  # For video search
-# We use pytube.request to fetch raw HTML for playlist scraping.
+import requests
+from googlesearch import search
+from youtubesearchpython import VideosSearch
 from pytube import request
 from bs4 import BeautifulSoup
-
-# For the AI model query (Groq)
 from groq import Groq
+
+prep_router = APIRouter()
+
+# Load environment variables from the project root
+env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.env'))
+load_dotenv(env_path)
 
 system_prompt = """
 user will ask abaout any topic to prepare so your task is to give a very simple way of preparing for the goal which 
 the user want to learn.
 your reply should be very precise
 """
-env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.env'))
-load_dotenv(env_path)
 Direction = [
     {"role": "system", "content": system_prompt}
 ]
-
-
 
 # ---------------------------
 # YouTube & Learning Functions
@@ -50,10 +44,8 @@ def search_youtube_playlists(query: str, num_playlists: int = 3):
         playlist_url = f"https://www.youtube.com/playlist?list={pid}"
         playlist_html = request.get(playlist_url)
         playlist_soup = BeautifulSoup(playlist_html, 'html.parser')
-        # Extract title from the <title> tag
         title_tag = playlist_soup.find('title')
         title = title_tag.get_text().replace(" - YouTube", "").strip() if title_tag else "Playlist"
-        # Extract thumbnail from the og:image meta tag
         thumbnail_meta = playlist_soup.find('meta', property="og:image")
         thumbnail = thumbnail_meta.get("content") if thumbnail_meta else ""
         playlists.append({
@@ -62,7 +54,6 @@ def search_youtube_playlists(query: str, num_playlists: int = 3):
             "thumbnail": thumbnail
         })
     return playlists
-
 
 def search_youtube_videos(query: str, num_videos: int = 7):
     video_search = VideosSearch(query, limit=num_videos)
@@ -82,18 +73,13 @@ def search_learning_websites(query: str, num_links: int = 5):
 # ---------------------------
 # Groq AI Query Function
 # ---------------------------
-# Initialize Groq client with your API key (replace with your own key)
-GROQ_API_KEY= os.getenv("GROQ_API_KEY_1")
-
+GROQ_API_KEY = os.getenv("GROQ_API_KEY_1")
 groq_client = Groq(api_key=GROQ_API_KEY)
 
 def query_groq(user_input: str) -> str:
-    """
-    Queries the Groq API (an AI model) with the user query to produce a very short summary/preparation hint.
-    """
     completion = groq_client.chat.completions.create(
         model="llama-3.2-90b-vision-preview",
-        messages = Direction + [{"role": "user", "content": user_input}],
+        messages=Direction + [{"role": "user", "content": user_input}],
         temperature=1,
         max_completion_tokens=1024,
         top_p=1,
@@ -103,19 +89,13 @@ def query_groq(user_input: str) -> str:
     return completion.choices[0].message.content if completion.choices else "No response from Groq"
 
 # ---------------------------
-# FastAPI App
+# API Endpoints using the Router
 # ---------------------------
-app = FastAPI()
+@prep_router.get("/")
+def read_prepbk():
+    return {"message": "Prepbk API is working"}
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.post("/get_resources")
+@prep_router.post("/get_resources")
 def get_resources(data: Dict[str, str]):
     user_query = data.get("query")
     if not user_query:
@@ -132,8 +112,3 @@ def get_resources(data: Dict[str, str]):
         "playlists": playlists,
         "learning_resources": learning_links
     }
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8001)

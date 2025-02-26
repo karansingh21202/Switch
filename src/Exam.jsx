@@ -464,7 +464,7 @@ const QuizApp = () => {
   const fetchQuestionsForSubject = async (subject, difficulty, proficiency) => {
     setIsLoading(true);
     try {
-      const response = await fetch("http://127.0.0.1:8002/generate-quiz", {
+      const response = await fetch("http://127.0.0.1:7000/quiz/generate-quiz", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ subject, difficulty, proficiency })
@@ -513,7 +513,7 @@ const QuizApp = () => {
   // Call backend endpoint to get detailed feedback for incorrect questions
   const fetchFeedback = async (incorrectQuestions) => {
     try {
-      const response = await fetch("http://127.0.0.1:8002/generate-feedback", {
+      const response = await fetch("http://127.0.0.1:7000/quiz/generate-feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ incorrectQuestions })

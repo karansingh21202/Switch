@@ -291,7 +291,15 @@ const waitForAudioFile = async (url, timeout = 10000, interval = 500) => {
   throw new Error("Audio file not found within timeout");
 };
 
-// Message component with professional styling
+const getDomain = (url) => {
+  try {
+    const { hostname } = new URL(url);
+    return hostname.replace(/^www\./, '');
+  } catch (err) {
+    return url;
+  }
+};
+
 const Message = ({ msg, index, speakingMessageId }) => (
   <div className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"} mb-4`}>
     <div className={`flex items-end ${msg.sender === "user" ? "flex-row-reverse" : ""}`}>
@@ -320,7 +328,6 @@ const Message = ({ msg, index, speakingMessageId }) => (
   </div>
 );
 
-// Welcome message displayed when there are no messages yet
 const WelcomeMessage = () => (
   <div className="text-center p-4">
     <h2 className="text-2xl font-bold text-gray-800">Welcome to your AI Interview Practice Session</h2>
@@ -338,11 +345,10 @@ const App = () => {
   const recognitionRef = useRef(null);
   const chatboxRef = useRef(null);
   const audioRef = useRef(null);
-  const tempTranscript = useRef(""); // To store interim and final transcript
-  const listeningRef = useRef(false); // New ref to reliably track listening state
+  const tempTranscript = useRef("");
+  const listeningRef = useRef(false);
 
   useEffect(() => {
-    // Cleanup on unmount
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
@@ -357,20 +363,19 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    // Auto-scroll chat box when new messages arrive
     if (chatboxRef.current) {
       chatboxRef.current.scrollTop = chatboxRef.current.scrollHeight;
     }
   }, [messages]);
 
-  // Stop any ongoing audio playback and notify backend (if needed)
+  // Update the endpoint for stopping audio
   const stopAudioPlayback = () => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
       audioRef.current = null;
     }
-    fetch("http://127.0.0.1:8000/stop_audio")
+    fetch("http://127.0.0.1:7000/voic/stop_audio")
       .then((response) => response.json())
       .then((data) => console.log("Backend audio stop:", data))
       .catch((error) => {
@@ -378,7 +383,6 @@ const App = () => {
       });
   };
 
-  // Process speech result, update messages, and play the assistant's response
   const handleSpeechResult = async (finalText) => {
     setMessages((prev) => [
       ...prev,
@@ -386,7 +390,8 @@ const App = () => {
     ]);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/query", {
+      // Update the endpoint for query to include /voic prefix
+      const response = await fetch("http://127.0.0.1:7000/voic/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: finalText }),
@@ -401,8 +406,8 @@ const App = () => {
 
       setMessages((prev) => [...prev, newMessage]);
 
-      // Wait for the audio file to be generated before playing it.
-      const audioUrl = "http://127.0.0.1:8000/response.mp3";
+      // Update the audio file URL endpoint accordingly
+      const audioUrl = "http://127.0.0.1:7000/voic/response.mp3";
       try {
         await waitForAudioFile(audioUrl);
       } catch (err) {
@@ -437,7 +442,6 @@ const App = () => {
     }
   };
 
-  // Updated startListening function with continuous mode and auto-restart logic
   const startListening = () => {
     if (!("webkitSpeechRecognition" in window)) {
       console.error("Speech recognition is not supported in this browser. Use Chrome.");
@@ -446,7 +450,7 @@ const App = () => {
 
     const recognition = new window.webkitSpeechRecognition();
     recognition.lang = "en-US";
-    recognition.continuous = true; // Keep capturing until explicitly stopped
+    recognition.continuous = true;
     recognition.interimResults = true;
 
     recognition.onresult = (event) => {
@@ -467,7 +471,6 @@ const App = () => {
       listeningRef.current = false;
     };
 
-    // When recognition ends (e.g., due to silence), restart it if still listening
     recognition.onend = () => {
       if (listeningRef.current) {
         recognition.start();
@@ -478,24 +481,21 @@ const App = () => {
     recognition.start();
   };
 
-  // Updated microphone toggle handler to sync state with listeningRef
   const handleMicClick = () => {
     if (!listening) {
-      // Start listening
       stopAudioPlayback();
       if (recognitionRef.current) {
         recognitionRef.current.stop();
         recognitionRef.current = null;
       }
       setListening(true);
-      listeningRef.current = true; // update ref
+      listeningRef.current = true;
       tempTranscript.current = "";
       setLiveTranscript("");
       startListening();
     } else {
-      // Stop listening
       setListening(false);
-      listeningRef.current = false; // update ref
+      listeningRef.current = false;
       if (recognitionRef.current) {
         recognitionRef.current.stop();
         recognitionRef.current = null;
