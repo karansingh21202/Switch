@@ -1,14 +1,15 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import routers from the src package
 from src.Prepbk import prep_router
 from src.Quiz import quiz_router
-from src.Voic import voic_router  # Assuming you have refactored Voic similarly
+from src.Voic import voic_router
 
 app = FastAPI()
 
-# Enable CORS for all routes
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,10 +18,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers with prefixes so endpoints are namespaced
+# Include routers
 app.include_router(prep_router, prefix="/prepbk")
 app.include_router(quiz_router, prefix="/quiz")
 app.include_router(voic_router, prefix="/voic")
+
+# Serve frontend from FastAPI
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 @app.get("/")
 def read_root():
@@ -28,5 +32,4 @@ def read_root():
 
 if __name__ == "__main__":
     import uvicorn
-    # For local testing, use port 7000 (or any port you choose)
     uvicorn.run(app, host="127.0.0.1", port=7000)
