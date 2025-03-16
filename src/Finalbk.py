@@ -35,10 +35,6 @@ from jose import jwt, JWTError
 # ---------------------------
 
 # Initialize Groq clients (replace the API keys with your own)
-groq_general = Groq(api_key="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")  # For /get_resources
-tech_groq_client = Groq(api_key="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")  # For technical interview queries
-hr_groq_client = Groq(api_key="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")    # For HR interview queries
-quiz_groq_client = Groq(api_key="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")   # For quiz generation/feedback
 
 # System prompt for get_resources endpoint
 system_prompt = """
