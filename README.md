@@ -8,7 +8,7 @@ This project is an AI-driven Ed-Tech platform designed to provide students with 
 3. Job Finder: Matches job opportunities based on the user's profile.
 
 ## Tech Stack
-- Backend: Python (Finalbk.py)
+- Backend: Python (Fast api)
 - Frontend: React (Run using npm install and npm run dev)
 - AI Models Used:
   - Groq: For AI-driven interviews and preparation resource search.
